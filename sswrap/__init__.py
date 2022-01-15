@@ -7,6 +7,8 @@ from .spreadsheet import Spreadsheet
 from .writable_spreadsheet import WritableSpreadsheet
 from .writable_worksheet import WritableWorksheet
 
+__version__ = "0.0.1"
+
 
 def load(path: Union[str, Path]) -> "Spreadsheet":
     if isinstance(path, str) and os.path.exists(path):
