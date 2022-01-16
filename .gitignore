@@ -127,3 +127,7 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+# Additional settings for Google Sheets API
+token.json
+credentials.json

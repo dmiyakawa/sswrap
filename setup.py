@@ -4,17 +4,16 @@ import os
 from setuptools import setup, find_packages
 
 try:
-    with open('README.md') as f:
+    with open("README.md") as f:
         readme = f.read()
 except IOError:
-    readme = ''
+    readme = ""
 
 
 def _requires_from_file(filename):
     return open(filename).read().splitlines()
 
 
-# version
 here = os.path.dirname(os.path.abspath(__file__))
 version = next((line.split('=')[1].strip().replace('"', '').replace("'", '')
                 for line in open(os.path.join(here, 'sswrap', '__init__.py'))
@@ -32,7 +31,7 @@ setup(
     description='Spreadsheet and Worksheet wrapper',
     long_description=readme,
     packages=find_packages(),
-    install_requires=_requires_from_file('requirements.txt'),
+    install_requires=_requires_from_file("requirements.txt"),
     license="Apache 2",
     classifiers=[
         'Development Status :: 3 - Alpha',
@@ -46,6 +45,6 @@ setup(
     entry_points="""
       # -*- Entry points: -*-
       [console_scripts]
-      pkgdep = pypipkg.scripts.command:main
+      sswrap = pypipkg.scripts.command:main
     """,
 )

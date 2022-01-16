@@ -1,12 +1,11 @@
-from sswrap import Spreadsheet
+from abc import ABC
+
+from sswrap.spreadsheet import Spreadsheet
 
 
-class WritableSpreadsheet(Spreadsheet):
+class WritableSpreadsheet(Spreadsheet, ABC):
     def __init__(self):
         super().__init__()
 
     def add_worksheet(self) -> "WritableWorksheet":
-        from sswrap import WritableWorksheet
-        ws = WritableWorksheet()
-        self._worksheets.append(ws)
-        return ws
+        raise NotImplementedError()

@@ -1,19 +1,25 @@
-from typing import List
+from abc import ABC, abstractmethod
 
 from sswrap.worksheet import Worksheet
 
 
-class Spreadsheet:
-    """
-    A spreadsheet that may contain multiple worksheets.
+class Spreadsheet(ABC):
+    """\
+    A spreadsheet that contains one or multiple worksheets.
     Note that a spreadsheet built from a CSV file just contains a single worksheet, while
     one from an Excel or Google Sheets can contain multiple worksheets.
     """
-    def __init__(self):
-        self._worksheets: List[Worksheet] = []
 
+    @abstractmethod
     def num_worksheets(self) -> int:
-        return len(self._worksheets)
+        raise NotImplementedError()
 
-    def __getitem__(self, index: int):
-        return self._worksheets[index]
+    @abstractmethod
+    def __getitem__(self, index: int) -> Worksheet:
+        raise NotImplementedError()
+
+    @abstractmethod
+    def __len__(self) -> int:
+        raise NotImplementedError()
+
+

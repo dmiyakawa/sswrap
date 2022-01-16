@@ -1,15 +1,14 @@
+from abc import ABC, abstractmethod
 from typing import Any, List
 
 from sswrap.worksheet import Worksheet
 
 
-class WritableWorksheet(Worksheet):
-    def __init__(self):
-        super().__init__()
-
-    @property
+class WritableWorksheet(Worksheet, ABC):
+    @abstractmethod
     def rows(self) -> List[List[Any]]:
-        return self._rows
+        raise NotImplementedError()
 
+    @abstractmethod
     def set_value(self, row_index: int, col_index: int, value: Any):
-        self._rows[row_index][col_index] = value
+        raise NotImplementedError()
