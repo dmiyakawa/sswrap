@@ -16,5 +16,5 @@ class TestSswrap(unittest.TestCase):
         self.assertEqual("A1", ws.get_value(0, 0))
         self.assertEqual("A2", ws.get_value(1, 0))
         self.assertEqual("B1", ws.get_value(0, 1))
-
-
+        self.assertEqual("B3", ws.get_value(2, 1))
+        self.assertEqual("Z3", ws.get_value(2, 25))
