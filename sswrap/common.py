@@ -15,6 +15,10 @@ def to_a1_cell(row_index: int, col_index: int) -> str:
 
 
 def to_a1_range(start_row_index: int, start_col_index: int, end_row_index: int, end_col_index: int) -> str:
+    """\
+    指定した2セルを始まりのセル、終わりのセルとした範囲を "A1:B2" のような形式で返す。
+    (end_row_index, end_col_index) で指定されるセルを含む
+    """
     return "{}:{}".format(to_a1_cell(start_row_index, start_col_index),
                           to_a1_cell(end_row_index, end_col_index))
 

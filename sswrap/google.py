@@ -1,6 +1,6 @@
 import os.path
 from enum import Enum
-from typing import List, Any, Dict, Optional
+from typing import List, Any, Dict, Optional, Union
 
 import googleapiclient.discovery
 from google.auth.transport.requests import Request
@@ -94,11 +94,17 @@ class GoogleSpreadsheet(Spreadsheet):
                                                         token_path=token_path,
                                                         writable=writable)
         self._metadata = self._get_remote_metadata()
+        self._sheet_title_to_index: Dict[str, int] = {
+            sheet["properties"]["title"]: i for i, sheet in enumerate(self._metadata["sheets"])
+        }
         self._value_render_option = value_render_option
 
     @property
     def metadata(self):
         return self._metadata
+
+    def get_sheet_names(self) -> List[str]:
+        return list(self._sheet_title_to_index.keys())
 
     def _get_remote_metadata(self):
         return self._resource.get(spreadsheetId=self._spreadsheet_id, fields=None).execute()
@@ -106,13 +112,25 @@ class GoogleSpreadsheet(Spreadsheet):
     def num_worksheets(self) -> int:
         return len(self._metadata.get('sheets', 0))
 
-    def __getitem__(self, index: int) -> "GoogleWorksheet":
+    def __getitem__(self, index_or_name: Union[int, str]) -> "GoogleWorksheet":
+        if isinstance(index_or_name, str):
+            index = self._sheet_title_to_index[index_or_name]
+        else:
+            index = index_or_name
         return GoogleWorksheet(self,
-                               self._metadata.get('sheets', [])[index],
+                               self._metadata.get("sheets", [])[index],
                                value_render_option=self._value_render_option)
 
     def __len__(self) -> int:
         return len(self._metadata.get('sheets', []))
+
+    @property
+    def resource(self):
+        return self._resource
+
+    @property
+    def spreadsheet_id(self):
+        return self._spreadsheet_id
 
 
 class GoogleWorksheet(Worksheet):
@@ -124,29 +142,37 @@ class GoogleWorksheet(Worksheet):
         self._spreadsheet = spreadsheet
         self._metadata = metadata
         grid_properties = self._metadata["properties"]["gridProperties"]
+        # 巨大なシートをまだ対象としてない
         row_count = grid_properties["rowCount"]
         col_count = grid_properties["columnCount"]
         # TODO: Implement non-cache initialization
-        self._cache: Optional[List[List[Any]]] = self._get_remote_range(
+        self._cache: Optional[List[List[Any]]] = self.fetch_remote_range(
             0, 0, row_count - 1, col_count - 1, value_render_option=value_render_option)
 
     @property
     def title(self):
         return self._metadata["properties"]["title"]
 
-    def _get_remote_range(self,
-                          start_row_index: int,
-                          start_col_index: int,
-                          end_row_index: int,
-                          end_col_index: int,
-                          *,
-                          value_render_option: ValueRenderOption = ValueRenderOption.FORMATTED_VALUE)\
+    @property
+    def metadata(self):
+        return self._metadata
+
+    def fetch_remote_range(self,
+                           start_row_index: int,
+                           start_col_index: int,
+                           end_row_index: int,
+                           end_col_index: int,
+                           *,
+                           value_render_option: ValueRenderOption = ValueRenderOption.FORMATTED_VALUE)\
             -> List[List[Any]]:
+        """\
+        指定したリモート範囲を取得して返す。内部キャッシュを無視する。また内部キャッシュを更新しない
+        """
         range_str = to_a1_range(start_row_index, start_col_index, end_row_index, end_col_index)
-        result = self._spreadsheet._resource.values().get(spreadsheetId=self._spreadsheet._spreadsheet_id,
-                                                          range="{}!{}".format(self.title, range_str),
-                                                          valueRenderOption=value_render_option.value).execute()
-        return result.get('values')
+        result = self._spreadsheet.resource.values().get(spreadsheetId=self._spreadsheet.spreadsheet_id,
+                                                         range="{}!{}".format(self.title, range_str),
+                                                         valueRenderOption=value_render_option.value).execute()
+        return result.get("values")
 
     def get_value(self, row_index: int, col_index: int) -> Any:
         return self._cache[row_index][col_index]
@@ -154,6 +180,59 @@ class GoogleWorksheet(Worksheet):
     def get_by_cell(self, cell: str) -> Any:
         row_index, col_index = from_a1_cell(cell)
         return self.get_value(row_index, col_index)
+
+    def get_range_as_dict(self,
+                          start_row_index: int,
+                          start_col_index: int,
+                          end_row_index: int,
+                          end_col_index: int,
+                          *,
+                          name_map: Optional[Dict[str, str]] = None,
+                          ignore_shorter_content: bool = True,
+                          ignore_longer_content: bool = True)\
+            -> List[Dict[str, Any]]:
+        """\
+        指定したリモート範囲の1行目をヘッダ行とみなし、辞書にして返す。
+        辞書のキーはヘッダ行のそれぞれが文字列に変換されたものである。
+
+        name_map がある場合、ヘッダに記載された名前をキーとしてname_mapを探索し、
+        もし対応するvalueがあるなら、返却されるキーもその変換後の名前になる。
+
+        ヘッダ行より長いデータ本体の行が存在した場合、ignore_longer_contentがTrueなら無視し、Falseなら例外を送出する
+        """
+        if end_row_index - start_row_index < 1:
+            raise SswrapException("Row range not sufficient")
+        assert self._cache
+        rows = self._cache[start_row_index:end_row_index + 1]
+
+        assert len(rows) > 1
+        header_row = rows[0][start_col_index:end_col_index + 1]
+        header_length = len(header_row)
+        col_to_name: Dict[int, str] = {}
+        if name_map is None:
+            name_map = {}
+        appeared = set()
+        for i, org_header in enumerate(header_row):
+            header = name_map.get(org_header, org_header)
+            if header in appeared:
+                header_str = f"\"{header}\"" if header == org_header else f"\"{header}\" (org: \"{org_header}\")"
+                raise SswrapException(f"header {header_str} already appeared")
+            col_to_name[i] = header
+        ret = []
+        for raw_i, row in enumerate(rows[1:]):
+            row_index = start_row_index + raw_i + 1
+            if header_length < len(row):
+                if ignore_longer_content:
+                    row = row[:header_length]
+                else:
+                    raise SswrapException(f"Too long content row at {row_index}")
+            elif header_length > len(row):
+                if ignore_shorter_content:
+                    row = row + [None] * (header_length - len(row))
+                else:
+                    raise SswrapException(f"Too short content row at {row_index}")
+            ret.append({col_to_name[col_i]: col for col_i, col in enumerate(row)})
+        return ret
 
 
 def _run_smoke_test():
