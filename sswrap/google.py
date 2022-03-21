@@ -19,10 +19,10 @@ _DEFAULT_WRITABLE = False
 _DEFAULT_PREFETCH = True
 
 
-def _prepare_spreadsheets_resource(*,
-                                   credential_path: str = _DEFAULT_CREDENTIAL_PATH,
-                                   token_path: str = _DEFAULT_TOKEN_PATH,
-                                   writable: bool = _DEFAULT_WRITABLE) -> googleapiclient.discovery.Resource:
+def prepare_spreadsheets_resource(*,
+                                  credential_path: str = _DEFAULT_CREDENTIAL_PATH,
+                                  token_path: str = _DEFAULT_TOKEN_PATH,
+                                  writable: bool = _DEFAULT_WRITABLE) -> googleapiclient.discovery.Resource:
     """\
     Constructs a googleapiclient.discovery.Resource for interacting with Google Sheets API.
 
@@ -84,15 +84,23 @@ class GoogleSpreadsheet(Spreadsheet):
     def __init__(self,
                  spreadsheet_id: str,
                  *,
-                 credential_path: str = _DEFAULT_CREDENTIAL_PATH,
-                 token_path: str = _DEFAULT_TOKEN_PATH,
-                 writable: bool = _DEFAULT_WRITABLE,
-                 value_render_option: ValueRenderOption = ValueRenderOption.FORMATTED_VALUE):
+                 value_render_option: ValueRenderOption = ValueRenderOption.FORMATTED_VALUE,
+                 resource: Optional[googleapiclient.discovery.Resource] = None,
+                 credential_path: Optional[str] = None,
+                 token_path: Optional[str] = None,
+                 writable: Optional[bool] = None):
         super().__init__()
         self._spreadsheet_id = spreadsheet_id
-        self._resource = _prepare_spreadsheets_resource(credential_path=credential_path,
-                                                        token_path=token_path,
-                                                        writable=writable)
+        if resource:
+            self._resource = resource
+        else:
+            credential_path = _DEFAULT_CREDENTIAL_PATH if credential_path is None else credential_path
+            token_path = _DEFAULT_TOKEN_PATH if token_path is None else token_path
+            writable = _DEFAULT_WRITABLE if writable is None else writable
+            self._resource = prepare_spreadsheets_resource(credential_path=credential_path,
+                                                           token_path=token_path,
+                                                           writable=writable)
+
         self._metadata = self._get_remote_metadata()
         self._sheet_title_to_index: Dict[str, int] = {
             sheet["properties"]["title"]: i for i, sheet in enumerate(self._metadata["sheets"])
@@ -240,7 +248,7 @@ def _run_smoke_test():
     Runs a simple procedure demonstrating Google Sheets API.
     See also https://developers.google.com/sheets/api/quickstart/python
     """
-    resource = _prepare_spreadsheets_resource()
+    resource = prepare_spreadsheets_resource()
     # This spreadsheet is maintained by Google, not by us.
     result = resource.values().get(spreadsheetId="1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms",
                                    range="Class Data!A2:E").execute()
