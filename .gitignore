@@ -131,4 +131,4 @@ dmypy.json
 # Additional settings for Google Sheets API
 token.json
 credentials.json
-samples/
+private_samples/
